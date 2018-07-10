@@ -184,6 +184,7 @@ def show_prediction_labels_on_image(img_path, predictions, data, counter):
 
     PATH = str(config['PATHS']['Sessions']) + str(data['classRoom']) + '/' + str(data['courseNumber']+'/'+'FramePictures')
     pil_image = Image.open(img_path).convert("RGB")
+    print(img_path)
     draw = ImageDraw.Draw(pil_image)
 
     for name, (top, right, bottom, left) in predictions:
@@ -466,6 +467,12 @@ def TakeAttendence(request):
         count = 0
 
         # for all the images in the Images folder(group photos) face recognition is appilied 
+        totalFaces=[]
+        totalPresent=[]
+        imagesFileList=[]
+        predictions=[]
+        totalAbsent=[]
+        predCount = 0
         for image_file in os.listdir(PATH + '/Images'):
             full_file_path = os.path.join(PATH + '/Images', image_file)
 
@@ -507,16 +514,34 @@ def TakeAttendence(request):
 
             # Find all people in the image using a trained classifier model
             # Note: You can pass in either a classifier file name or a classifier model instance
-            predictions = predict(full_file_path, model_path=PATH + "/trained_knn_model.clf")
+            predictions .append(predict(full_file_path, model_path=PATH + "/trained_knn_model.clf"))
 
             # Print results on the console
-            for name, (top, right, bottom, left) in predictions:
+            faces=0
+            present=0
+            absent=0
+            for name, (top, right, bottom, left) in predictions[predCount]:
                 print("- Found {} at ({}, {})".format(name, left, top))
+                if name!= 'unknown':
+                    present+=1
+                else:
+                    absent+=1
                 if name in data['studentlist']:
                     data1[name] += 1
-            count += 1
-        show_prediction_labels_on_image(os.path.join(PATH + '/Images', image_file), predictions,data, count)
-
+                faces+=1
+            totalFaces.append(faces)
+            totalAbsent.append(absent)
+            totalPresent.append(present)
+            imagesFileList.append(image_file)   
+            maxFaces = totalPresent.index(max(totalPresent))
+            print("totalpresent "+str(totalPresent)+"  max of totalpresent  "+str(max(totalPresent)))
+            print("totalAbsent "+str(totalAbsent))
+            print("totalfaces  "+str(totalFaces)+"   totalfaces  "+str(totalFaces[maxFaces]))
+            print("maxFaces image is  "+imagesFileList[maxFaces])
+            count+= 1
+        predCount+=1
+        #show_prediction_labels_on_image(PATH + '/Images/'+imagesFileList[maxFaces], predictions,data, count)
+        show_prediction_labels_on_image(os.path.join(PATH + '/Images', imagesFileList[maxFaces]), predictions[maxFaces],data, count)
         # deleting the KnownImages folder after he attendence has been taken
         # optional - delete the classifer after he attendence has been taken
         if config['USE']['DATABASE'] == 'YES':
@@ -540,7 +565,7 @@ def TakeAttendence(request):
         p["Frame4"]='Frame4.jpg'
         p["Frame5"]='Frame5.jpg'
         data["imagepaths"].append(p)
-
+        data["totalFaces"]=totalFaces
         # restructuring the data in XML format and rendering out XML response
         if config['METHOD']['RSP_METHOD'] == 'XML':
             import xml.etree.cElementTree as ET
